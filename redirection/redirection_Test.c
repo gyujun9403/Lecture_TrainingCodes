@@ -8,83 +8,77 @@
 
 volatile int main(int argc, char *argv[], char **env)
 {
-	int fd1[2], fd2[2];
+	int	idx_fork = 0;
+	int	num_fork = 2;
+	int fd1[2][2];
 	char buffer[BUFSIZE];
 	pid_t pid;
-	if(pipe(fd1) == -1||pipe(fd2) == -1)
+
+	while (idx_fork < num_fork)
 	{
-		puts("pipe() error");
-		exit(1);
+		if(pipe(fd1[idx_fork]) == -1)
+		{
+			puts("pipe() error");
+			exit(1);
+		}
+		pid = fork();
+		if(pid == -1)
+		{
+			puts("fork() error");
+			exit(1);
+		}
+		else if (pid != 0)
+			break ;
+		idx_fork++;
 	}
-	pid = fork();
-	if(pid == -1)
+	if (idx_fork == 0)
 	{
-		puts("fork() error");
-		exit(1);
-	}
-	else if(pid != 0)
-	{
-		char	buffer;
 		int		state;
-		int		ret;
-		int fd = open("./redirection_Test.c", O_RDONLY);
-		//dup2(fd1[1], fd);
-		//dup2(fd, STDIN_FILENO);
-		dup2(fd1[1], STDOUT_FILENO);
-		while (read(fd, &buffer, 1) == 1)
-			printf("%c", buffer);
-		ret = waitpid(pid, &state, 0);
-		// if (WEXITSTATUS(state) != 0)
-		// 	exit(WEXITSTATUS(state));
-		// else
-		// 	exit(0);
+		printf("parent Wating...\n");
+		waitpid(pid, &state, WNOHANG);
+		printf("parent END Wating...\n");
+		if (WEXITSTATUS(state) != 0)
+			exit(WEXITSTATUS(state));
+		else
+			exit(0);
+	}
+	else if (idx_fork == 1)
+	{
+		char	**cat;
+		int		state;
+		int fd = open("./out1", O_WRONLY | O_TRUNC | O_CREAT, 0666);
+		if (fd < 0)
+			printf("ERR1");
+		cat = (char **)malloc(sizeof(char *) * 3);
+		cat[0] = strdup("/bin/cat");
+		cat[1] = strdup("-n");
+		cat[2] = NULL;
+		printf("WAITING...\n");
+		waitpid(pid, &state, 0);
+		printf("END WAITING, %d\n", fd);
+		if (WEXITSTATUS(state) != 0)
+			exit(WEXITSTATUS(state));
+		close(fd1[idx_fork][1]);
+		dup2(fd1[idx_fork][0], STDIN_FILENO);
+		dup2(fd, STDOUT_FILENO);
+		execve(cat[0], cat, env);
 	}
 	else
 	{
-		char	buff[BUFSIZE];
 		char	**cat;
-		int fd_file1;
-		fd_file1 = open("./out1", O_WRONLY | O_TRUNC | O_CREAT, 0666);
-		if (fd_file1 < 0)
-			printf("err\n");
-		else
-		{
-			printf("ss\n");
-		}
-		printf("1111");
+		int fd = open("./redirection_Test.c", O_RDONLY);
+		int fd2 = open("./test", O_RDONLY);
+		if (fd < 0)
+			printf("ERR2");
 		cat = (char **)malloc(sizeof(char *) * 3);
-		printf("1111");
 		cat[0] = strdup("/bin/cat");
-		printf("1111");
-		cat[1] = strdup("-n");
-		printf("1111");
+		cat[1] = strdup("./aa");
 		cat[2] = NULL;
-		printf("1111");
-		sleep(1);
-		printf("2222");
-		dup2(fd1[0], STDIN_FILENO);
-		printf("3333");
-		dup2(fd_file1, STDOUT_FILENO);
-		printf("4444");
-		close(fd1[1]);
-		printf("5555");
-		read(STDIN_FILENO, buff, BUFSIZE);
-		printf("6666");
-		write(STDOUT_FILENO, buff, BUFSIZE);
-		
-		//printf("%s", buff);
-		//printf("dsafdsafdasf");
-		//execve(cat[0], cat, NULL);
-		exit(1);
+		printf("%d : %d, %d\n", idx_fork, fd1[idx_fork - 1][1], fd);
+		dup2(fd1[idx_fork - 1][1], STDOUT_FILENO);
+		dup2(fd, STDIN_FILENO);
+		dup2(fd2, STDIN_FILENO);
+		execve(cat[0], cat, env);
 	}
-
-	// int fd = open("./out1", O_WRONLY | O_TRUNC | O_CREAT);
-	// if (fd < 0)
-	// 	printf("err\n");
-	// {
-	// 	dup2(fd, STDOUT_FILENO);
-	// 	printf("tetsdtdstdstsdtsd");
-	// 	printf("hiiiiiii");
-	// }
 	return 0;
 }
